@@ -1,0 +1,192 @@
+Go to htdocs in xamp folder and write following command in cmd
+
+composer create-project laravel/laravel example-app
+composer create-project --prefer-dist laravel/laravel newstartup "10.*"
+
+
+
+cd example-app
+ 
+php artisan serve
+
+Now stepup database
+
+create database in phpmyadmin
+
+and connect it to .env file in project folder
+
+
+now install breez from official documentaion of laravel for authentication 
+
+composer require laravel/breeze --dev
+or
+composer require laravel/breeze:*
+now install breeze
+php artisan breeze:install
+
+
+
+select blade
+darkmode on prefrence
+phpunit or pest select pest
+
+
+check in .env that dbconnection is mysql
+
+now go to migration folder and write two new table in user
+ $table->enum('role', ['admin', 'user'])->default('user');
+            $table->enum('status', ['active', 'inactive'])->default('active');
+
+now write to migrate
+
+php artisan migrate
+
+
+now to make a seeder 
+php artisan make:seeder UserTableSeeder
+
+
+
+now go to user folder in models and make it free level
+    protected $guarded = [];
+
+now in usetabelseeder create default user
+use DB;
+use Illuminate\Support\Facades\Hash; 
+ DB::table('users')->insert([
+
+            // admin 
+            [
+                'name' => 'admin',
+                'email' => 'admin@gmail.com',
+                'password' => Hash::make('111'),
+                'role' => 'admin',
+                'status' => 'active',
+
+            ],
+            [
+                'name' => 'user',
+                'email' => 'user@gmail.com',
+                'password' => Hash::make('111'),
+                'role' => 'user',
+                'status' => 'active',
+            ],
+
+
+        ]);
+
+in seeder folder and database file write this code 
+        $this->call(UserTableSeeder::class);
+
+
+now insert the new data with this commmand 
+php artisan migrate:fresh --seed
+
+
+
+
+make new controller
+
+php artisan make:controller AdminController
+
+Route::get('/admin/dashboard', [AdminController::class, 'AdminDashboard'])->name('admin.dashboard');
+
+in controller
+   public function AdminDashboard()
+    {
+        return view('admin.admin_dashboard');
+    }
+
+create folder and file
+
+now go to auth folder and auth file and change the function to this "    public function store(LoginRequest $request): RedirectResponse
+    {
+        $request->authenticate();
+
+        $request->session()->regenerate();
+        $url = '';
+        if ($request->user()->role == 'admin') {
+            $url = '/admin/dashboard';
+        } else if ($request->user()->role == 'user') {
+            $url = '/dashboard';
+
+        }
+
+        return redirect()->intended($url);
+    }"
+
+now protect the admin dashboard url
+now make middkeware
+php artisan make:middleware AdminRole 
+now register the middleawre in kernal.php
+        'roles' => \App\Http\Middleware\AdminRole::class,
+
+
+now go to middelware folder and adminrole 
+and add this function 
+"    public function handle(Request $request, Closure $next, $role): Response
+    {
+        if ($request->user()->role !== $role)
+        {
+            return redirect('dashboard');
+        }
+        return $next($request);
+    }"
+
+
+
+now change to route to 
+
+Route::middleware(['auth', 'roles:admin'])->group(function () {
+
+    Route::get('/admin/dashboard', [AdminController::class, 'AdminDashboard'])->name('admin.dashboard');
+});
+
+
+how to login with name phone or email extra
+
+change the login front page to 
+"    <div>
+            <x-input-label for="email" :value="__('Email/Name')" />
+            <x-text-input id="email" class="block mt-1 w-full" type="text" name="login" :value="old('email')" required autofocus autocomplete="username" />
+        </div>"
+
+
+now to to request auth login request file 
+
+            'login' => ['required', 'string', ],
+
+
+
+and this fucntion 
+"   public function authenticate(): void
+    {
+        $this->ensureIsNotRateLimited();
+        $user = User::where('email', $this->login)->orWhere('name', $this->login)->first();
+        if (!$user || !Hash::check($this->password, $user->password)) {
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'login' => trans('auth.failed'),
+            ]);
+        }
+        Auth::login($user, $this->boolean('remember'));
+        RateLimiter::clear($this->throttleKey());
+    }
+
+"
+
+
+
+forget password functionality
+change .env to new mail setup like mail trap 
+
+"
+MAIL_MAILER=smtp
+MAIL_HOST=mailpit
+MAIL_PORT=1025
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_ENCRYPTION=null
+MAIL_FROM_ADDRESS="hello@example.com"
+MAIL_FROM_NAME="${APP_NAME}"
